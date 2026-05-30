@@ -12,15 +12,18 @@ import React, { useState, useEffect } from 'react';
 import { Tab, Student } from './types';
 import { ME_PROFILE } from './data';
 import DashboardView from './components/DashboardView';
+import ProfileView from './components/ProfileView';
 import DiscoverView from './components/DiscoverView';
 import ProjectsView from './components/ProjectsView';
 import CommunitiesView from './components/CommunitiesView';
 import MessagesView from './components/MessagesView';
 import SettingsView from './components/SettingsView';
 import AuthView from './components/AuthView';
+import AIRecommendations from './components/AIRecommendations';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { seedDatabaseIfEmpty } from './dbSeeder';
 import { 
   Compass, 
   Sparkles, 
@@ -36,7 +39,8 @@ import {
   Activity,
   Heart,
   Github,
-  Loader2
+  Loader2,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -47,6 +51,9 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Prime and bootstrap the database first if empty
+        await seedDatabaseIfEmpty();
+
         // Authenticated! Fetch custom student profile from Firestore
         try {
           const userDocRef = doc(db, 'students', firebaseUser.uid);
@@ -62,14 +69,14 @@ export default function App() {
           setMe({
             id: firebaseUser.uid,
             name: firebaseUser.email?.split('@')[0] || 'Academic Peer',
-            avatar: 'AP',
-            email: firebaseUser.email || 'student@skillsync.edu',
-            university: 'Academic Institute of Technology',
-            major: 'Computer Science',
-            year: 'Junior Year',
-            bio: 'Passionate about structural engineering and collaborative academic partnerships.',
-            skills: ['React', 'TypeScript'],
-            interests: ['Hackathons'],
+            avatar: firebaseUser.email ? firebaseUser.email.substring(0, 2).toUpperCase() : 'AP',
+            email: firebaseUser.email || '',
+            university: '',
+            major: '',
+            year: '',
+            bio: '',
+            skills: [],
+            interests: [],
             availability: 'Available'
           });
         }
@@ -86,6 +93,38 @@ export default function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Connection monitoring & dynamic toast state handles
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showConnectionToast, setShowConnectionToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'warning'>('success');
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setToastType('success');
+      setToastMessage('Connection restored! Live Cloud synchronizations active.');
+      setShowConnectionToast(true);
+      setTimeout(() => setShowConnectionToast(false), 4000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setToastType('warning');
+      setToastMessage('You are currently offline. Accessing cached student directories and project details.');
+      setShowConnectionToast(true);
+      setTimeout(() => setShowConnectionToast(false), 5000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Helper to trigger navigation into chat from Discover
   const handleOpenMessageThread = (participantName: string) => {
     setActiveTab(Tab.Messages);
@@ -101,6 +140,8 @@ export default function App() {
 
   const menuItems = [
     { tab: Tab.Dashboard, label: 'Dashboard', icon: LayoutDashboard },
+    { tab: Tab.Recommendations, label: 'AI Matchmaker', icon: Sparkles },
+    { tab: Tab.Profile, label: 'My Profile', icon: User },
     { tab: Tab.Discover, label: 'Find Peers', icon: Compass },
     { tab: Tab.Projects, label: 'Projects', icon: FolderGit2 },
     { tab: Tab.Communities, label: 'Communities', icon: Users },
@@ -129,6 +170,15 @@ export default function App() {
       </div>
     );
   }
+
+  const handleUpdateMe = async (updated: Student) => {
+    setMe(updated);
+    try {
+      await setDoc(doc(db, 'students', updated.id), updated);
+    } catch (error) {
+      console.error("Cloud database synchronization failed for profile updates:", error);
+    }
+  };
 
   if (!me) {
     return <AuthView onAuthSuccess={(student) => {
@@ -369,7 +419,25 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               {activeTab === Tab.Dashboard && (
-                <DashboardView me={me} onChangeMe={setMe} />
+                <DashboardView 
+                  me={me} 
+                  onChangeMe={handleUpdateMe} 
+                  onNavigateToRecommendations={() => setActiveTab(Tab.Recommendations)} 
+                />
+              )}
+              {activeTab === Tab.Recommendations && (
+                <AIRecommendations 
+                  me={me} 
+                  onChangeMe={handleUpdateMe} 
+                  onOpenMessageThread={handleOpenMessageThread}
+                  onNavigateToTab={(tab) => {
+                    if (tab === 'projects') setActiveTab(Tab.Projects);
+                    if (tab === 'communities') setActiveTab(Tab.Communities);
+                  }}
+                />
+              )}
+              {activeTab === Tab.Profile && (
+                <ProfileView me={me} onChangeMe={handleUpdateMe} />
               )}
               {activeTab === Tab.Discover && (
                 <DiscoverView me={me} onOpenMessageThread={handleOpenMessageThread} />
@@ -388,7 +456,7 @@ export default function App() {
                 />
               )}
               {activeTab === Tab.Settings && (
-                <SettingsView me={me} onChangeMe={setMe} onLogout={() => setMe(null)} />
+                <SettingsView me={me} onChangeMe={handleUpdateMe} onLogout={() => setMe(null)} />
               )}
             </motion.div>
           </AnimatePresence>
@@ -399,7 +467,7 @@ export default function App() {
           id="mobile-bottom-tabs"
           className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 flex items-center justify-around py-2.5 z-40 px-3 select-none"
         >
-          {menuItems.slice(0, 5).map((item) => {
+          {menuItems.filter(item => item.tab !== Tab.Communities && item.tab !== Tab.Settings).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.tab;
             return (
@@ -421,7 +489,7 @@ export default function App() {
                   )}
                 </div>
                 <span className={`text-[9px] mt-1 tracking-tight font-medium ${isActive ? 'font-bold text-blue-600' : 'text-slate-400'}`}>
-                  {item.label === 'Find Peers' ? 'Peers' : item.label}
+                  {item.label === 'Find Peers' ? 'Peers' : item.label === 'My Profile' ? 'Profile' : item.label}
                 </span>
               </button>
             );
@@ -441,6 +509,37 @@ export default function App() {
             </span>
           </button>
         </nav>
+
+        {/* Dynamic Interactive connection toast */}
+        <AnimatePresence>
+          {showConnectionToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="fixed bottom-20 lg:bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white p-4 rounded-xl shadow-xl flex items-center gap-3 max-w-sm"
+              role="alert"
+              aria-live="polite"
+            >
+              <div className={`w-2.5 h-2.5 rounded-full ${toastType === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <div className="flex-1">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  {toastType === 'success' ? '⚡ System Synced' : '⚠️ Offline Mode'}
+                </p>
+                <p className="text-[11px] text-slate-300 font-medium leading-relaxed mt-0.5">
+                  {toastMessage}
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowConnectionToast(false)}
+                className="text-slate-400 hover:text-slate-200 p-1 cursor-pointer transition-all active:scale-90"
+                aria-label="Dismiss Notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
 

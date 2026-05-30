@@ -9,7 +9,9 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendPasswordResetEmail,
-  signOut
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { 
   doc, 
@@ -36,7 +38,8 @@ import {
   Info,
   Calendar,
   Compass,
-  ArrowRight
+  ArrowRight,
+  Chrome
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -63,13 +66,13 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [university, setUniversity] = useState('Academic Institute of Technology');
-  const [major, setMajor] = useState('Computer Science & AI');
-  const [year, setYear] = useState('Junior Year');
-  const [bio, setBio] = useState('Enthusiastic developer ready to build student initiatives and sync engineering skills.');
+  const [major, setMajor] = useState('');
+  const [year, setYear] = useState('Freshman Year');
+  const [bio, setBio] = useState('');
   const [availability, setAvailability] = useState<'Available' | 'Busy' | 'Part-time'>('Available');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>(['React', 'TypeScript', 'Tailwind CSS']);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>(['Artificial Intelligence', 'Hackathons']);
-  const [avatar, setAvatar] = useState('SA');
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [avatar, setAvatar] = useState('');
   
   // Custom Drag & Drop Cover Support
   const [dragActive, setDragActive] = useState(false);
@@ -206,6 +209,48 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
   };
 
   // Auth Functions
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Try loading Firestore profile document if exists, else trigger onboarding
+      const userDocRef = doc(db, 'students', user.uid);
+      let profileSnap;
+      try {
+        profileSnap = await getDoc(userDocRef);
+      } catch (err) {
+        console.warn("Could not query Firestore directly, fallback to register layout.", err);
+      }
+
+      if (profileSnap && profileSnap.exists()) {
+        const studentProfile = profileSnap.data() as Student;
+        onAuthSuccess(studentProfile);
+      } else {
+        // First-time registration setup needed from Google Info
+        setFullName(user.displayName || user.email?.split('@')[0] || 'Peer Builder');
+        setEmail(user.email || '');
+        setScreen('onboarding');
+        setOnboardingStep(1);
+      }
+    } catch (err: any) {
+      console.error("Firebase Google Sign-In Error", err);
+      let desc = err.message || 'Google Login rejected.';
+      if (err.code === 'auth/popup-closed-by-user') {
+        desc = 'Sign-in window was closed before completion.';
+      } else if (err.code === 'auth/network-request-failed') {
+        desc = 'Network error. Please make sure you are online.';
+      }
+      setErrorMsg(`[Google Sign-In] ${desc}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -470,13 +515,28 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
                 )}
               </button>
             </form>
-
             <div className="relative my-6 text-center">
               <span className="absolute inset-x-0 top-1/2 h-px bg-slate-200/50 -translate-y-1/2"></span>
               <span className="relative bg-white px-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Alternative Channels</span>
             </div>
 
             <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full h-11 bg-white hover:bg-slate-50 text-slate-705 border border-slate-200 font-bold text-sm rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                ) : (
+                  <>
+                    <Chrome className="w-4 h-4 text-rose-500" />
+                    <span>Sign In with Google</span>
+                  </>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => {

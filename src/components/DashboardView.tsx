@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Student, Project } from '../types';
-import { MOCK_STUDENTS, MOCK_PROJECTS } from '../data';
+import { db } from '../firebase';
+import { onSnapshot, collection } from 'firebase/firestore';
 import { 
   Sparkles, 
   CheckCircle2, 
@@ -32,11 +33,12 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Props {
   me: Student;
   onChangeMe: (updated: Student) => void;
+  onNavigateToRecommendations?: () => void;
 }
 
 type DepartmentType = 'all' | 'cs' | 'design' | 'phd';
 
-export default function DashboardView({ me, onChangeMe }: Props) {
+export default function DashboardView({ me, onChangeMe, onNavigateToRecommendations }: Props) {
   // General State Controls
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [department, setDepartment] = useState<DepartmentType>('all');
@@ -47,13 +49,39 @@ export default function DashboardView({ me, onChangeMe }: Props) {
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Hardcoded updates feed tracking dynamic campus milestones
-  const [updates, setUpdates] = useState([
-    { id: 'up1', studentName: 'Sarah Jenkins', action: 'updated primary skills', detail: 'Added PyTorch & HuggingFace models', time: '12 min ago', studentId: 's1' },
-    { id: 'up2', studentName: 'Jin-Woo Park', action: 'created a new project', detail: 'Aegis: Decentralized Identity', time: '2 hours ago', studentId: 's2' },
-    { id: 'up3', studentName: 'Maya Lin', action: 'marked system status as available', detail: 'Seeking mobile development partners', time: '4 hours ago', studentId: 's3' },
-    { id: 'up4', studentName: 'Alex Chen', action: 'posted in community forum', detail: 'Recruiting for FinTech challenge', time: '1 day ago', studentId: 's4' }
-  ]);
+  // Real-time collections populated from the cloud database
+  const [students, setStudents] = useState<Student[]>([]);
+  const [projectsList, setProjectsList] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const unsubStudents = onSnapshot(collection(db, 'students'), (snapshot) => {
+      const list: Student[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Student);
+      });
+      setStudents(list);
+    }, (err) => {
+      console.warn("Firestore restricted inside DashboardView student lookup", err);
+    });
+
+    const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
+      const list: Project[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Project);
+      });
+      setProjectsList(list);
+    }, (err) => {
+      console.warn("Firestore restricted inside DashboardView project lookup", err);
+    });
+
+    return () => {
+      unsubStudents();
+      unsubProjects();
+    };
+  }, []);
+
+  // Community Activity feed tracking dynamic campus milestones
+  const [updates, setUpdates] = useState<Array<{ id: string; studentName: string; action: string; detail: string; time: string; studentId: string }>>([]);
 
   const [checklist, setChecklist] = useState([
     { id: '1', task: 'Verify student email credentials', completed: true },
@@ -63,17 +91,10 @@ export default function DashboardView({ me, onChangeMe }: Props) {
     { id: '5', task: 'Initiate or apply for a collaboration project', completed: false }
   ]);
 
-  const [notifications, setNotifications] = useState([
-    { id: 'n1', title: 'Sarah Jenkins sent a connection invite', time: '10m ago', unread: true },
-    { id: 'n2', title: 'Your system match score with Jin-Woo is now 89%', time: '2h ago', unread: true },
-    { id: 'n3', title: 'Hackathon Crusaders posted a new announcement', time: '1d ago', unread: false }
-  ]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; time: string; unread: boolean }>>([]);
 
   const [newEventText, setNewEventText] = useState('');
-  const [events, setEvents] = useState([
-    { id: 'e1', title: 'Campus AI Pitch Presentation', date: 'June 5, 2026', type: 'Competition' },
-    { id: 'e2', title: 'Invention & Hackathon Challenge', date: 'June 18, 2026', type: 'Hackathon' }
-  ]);
+  const [events, setEvents] = useState<Array<{ id: string; title: string; date: string; type: string }>>([]);
 
   // Handle outside click to close dropdown lookahead
   useEffect(() => {
@@ -158,13 +179,13 @@ export default function DashboardView({ me, onChangeMe }: Props) {
 
     const q = searchQuery.toLowerCase();
 
-    const filteredStudents = MOCK_STUDENTS.filter(s => 
+    const filteredStudents = students.filter(s => 
       s.name.toLowerCase().includes(q) || 
       s.major.toLowerCase().includes(q) || 
       s.skills.some(skill => skill.toLowerCase().includes(q))
     );
 
-    const filteredProjects = MOCK_PROJECTS.filter(p => 
+    const filteredProjects = projectsList.filter(p => 
       p.title.toLowerCase().includes(q) || 
       p.category.toLowerCase().includes(q) || 
       p.skillsNeeded.some(sku => sku.toLowerCase().includes(q))
@@ -174,7 +195,7 @@ export default function DashboardView({ me, onChangeMe }: Props) {
       students: filteredStudents,
       projects: filteredProjects
     };
-  }, [searchQuery]);
+  }, [searchQuery, students, projectsList]);
 
   // Derived metrics based on Department Filter Hook
   const departmentStats = useMemo(() => {
@@ -382,9 +403,18 @@ export default function DashboardView({ me, onChangeMe }: Props) {
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
               Welcome back, {me.name}!
             </h1>
-            <p className="text-blue-100 text-xs">
+            <p className="text-blue-100 text-xs mb-1">
               Academic Institute of Technology • {me.major}
             </p>
+            {onNavigateToRecommendations && (
+              <button
+                onClick={onNavigateToRecommendations}
+                className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-350 to-amber-400 hover:from-amber-405 hover:to-amber-450 text-slate-950 text-xs font-black rounded-xl shadow-md cursor-pointer transition-all active:scale-95 border border-amber-350/50"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-950 fill-amber-300 animate-pulse shrink-0" />
+                Analyze AI Matchmaker Ratings
+              </button>
+            )}
           </div>
 
           {/* Quick status controls */}
@@ -653,23 +683,29 @@ export default function DashboardView({ me, onChangeMe }: Props) {
                 </div>
 
                 <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                  {updates.map((up) => (
-                    <div 
-                      key={up.id}
-                      onClick={() => {
-                        // Attempt to locate student object in mock data to display details modal
-                        const peer = MOCK_STUDENTS.find(s => s.id === up.studentId);
-                        if (peer) setSelectedStudentDetail(peer);
-                      }}
-                      className="p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 text-xs cursor-pointer transition-all flex flex-col gap-1"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800">{up.studentName}</span>
-                        <span className="text-[9px] text-slate-400">{up.time}</span>
+                  {updates.length > 0 ? (
+                    updates.map((up) => (
+                      <div 
+                        key={up.id}
+                        onClick={() => {
+                          const peer = students.find(s => s.id === up.studentId);
+                          if (peer) setSelectedStudentDetail(peer);
+                        }}
+                        className="p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 text-xs cursor-pointer transition-all flex flex-col gap-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800">{up.studentName}</span>
+                          <span className="text-[9px] text-slate-400">{up.time}</span>
+                        </div>
+                        <p className="text-slate-500 font-medium">{up.action}: <span className="text-slate-600 font-semibold">{up.detail}</span></p>
                       </div>
-                      <p className="text-slate-500 font-medium">{up.action}: <span className="text-slate-600 font-semibold">{up.detail}</span></p>
+                    ))
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 font-medium flex flex-col items-center justify-center border border-dashed border-slate-100 rounded-xl bg-slate-50/50">
+                      <Clock className="w-8 h-8 text-slate-350 mb-1.5" />
+                      <p className="text-[11px]">No recent activity logged on campus yet.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -751,25 +787,32 @@ export default function DashboardView({ me, onChangeMe }: Props) {
             </div>
 
             <div className="space-y-2.5 max-h-36 overflow-y-auto pr-1">
-              {notifications.map((notif) => (
-                <div 
-                  key={notif.id}
-                  onClick={() => {
-                    setNotifications(notifications.map(n => n.id === notif.id ? { ...n, unread: false } : n));
-                  }}
-                  className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
-                    notif.unread 
-                      ? 'bg-blue-50/50 border-blue-100 text-blue-900 font-semibold' 
-                      : 'bg-white border-slate-100 text-slate-550 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 justify-between">
-                    <span className="line-clamp-1">{notif.title}</span>
-                    {notif.unread && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>}
+              {notifications.length > 0 ? (
+                notifications.map((notif) => (
+                  <div 
+                    key={notif.id}
+                    onClick={() => {
+                      setNotifications(notifications.map(n => n.id === notif.id ? { ...n, unread: false } : n));
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
+                      notif.unread 
+                        ? 'bg-blue-50/50 border-blue-100 text-blue-900 font-semibold' 
+                        : 'bg-white border-slate-100 text-slate-550 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 justify-between">
+                      <span className="line-clamp-1">{notif.title}</span>
+                      {notif.unread && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>}
+                    </div>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">{notif.time}</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 block mt-0.5">{notif.time}</span>
+                ))
+              ) : (
+                <div className="text-center py-6 text-slate-400 font-medium flex flex-col items-center justify-center border border-dashed border-slate-100 rounded-xl bg-slate-50/50">
+                  <Bell className="w-6 h-6 text-slate-300 mb-1" />
+                  <p className="text-[10px]">No notification alerts</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -815,22 +858,29 @@ export default function DashboardView({ me, onChangeMe }: Props) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {events.map((evt) => (
-              <div 
-                key={evt.id} 
-                className="group relative bg-slate-50/50 hover:bg-white border border-slate-100/70 hover:border-slate-200/90 p-4 rounded-xl transition-all shadow-sm"
-              >
-                <div className="absolute top-3 right-3 text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
-                  {evt.type}
+            {events.length > 0 ? (
+              events.map((evt) => (
+                <div 
+                  key={evt.id} 
+                  className="group relative bg-slate-50/50 hover:bg-white border border-slate-100/70 hover:border-slate-200/90 p-4 rounded-xl transition-all shadow-sm"
+                >
+                  <div className="absolute top-3 right-3 text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800">
+                    {evt.type}
+                  </div>
+                  <div className="mb-1 text-[10px] text-slate-400 font-mono font-medium">
+                    {evt.date}
+                  </div>
+                  <h3 className="font-bold text-slate-700 text-xs leading-snug group-hover:text-slate-900 transition-colors">
+                    {evt.title}
+                  </h3>
                 </div>
-                <div className="mb-1 text-[10px] text-slate-400 font-mono font-medium">
-                  {evt.date}
-                </div>
-                <h3 className="font-bold text-slate-700 text-xs leading-snug group-hover:text-slate-900 transition-colors">
-                  {evt.title}
-                </h3>
+              ))
+            ) : (
+              <div className="sm:col-span-2 text-center py-6 text-slate-400 font-medium flex flex-col items-center justify-center border border-dashed border-slate-100 rounded-xl bg-slate-50/50">
+                <Calendar className="w-7 h-7 text-slate-350 mb-1" />
+                <p className="text-[10px]">No active campus milestones declared. Declare one above!</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 

@@ -12,23 +12,17 @@ import {
   doc, 
   getDoc,
   setDoc,
-  getDocFromServer
+  getDocFromServer,
+  collection,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBw3gHuN89Y3KBZX2yyyNYDXF5XK1jgrj0",
-  authDomain: "skillsync-f699a.firebaseapp.com",
-  projectId: "skillsync-f699a",
-  storageBucket: "skillsync-f699a.firebasestorage.app",
-  messagingSenderId: "744914551736",
-  appId: "1:744914551736:web:1465900ddb3dc2b41ac54d",
-  measurementId: "G-WGK3KVN33F"
-};
+import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 
 // Error Types as defined by skill
 export enum OperationType {

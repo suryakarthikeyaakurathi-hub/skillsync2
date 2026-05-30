@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="192" height="192" rx="42" fill="#0F172A"/>
+  
+  <!-- Interlocking Synergy Circles with glowing aura -->
+  <circle cx="76" cy="96" r="34" fill="url(#circleGrad)" opacity="0.85"/>
+  <circle cx="116" cy="96" r="34" fill="url(#accentGrad)" opacity="0.85"/>
+  
+  <!-- Interlocking zone overlay -->
+  <path d="M 96,65 A 34,34 0 0,0 96,127 A 34,34 0 0,0 96,65 Z" fill="#F59E0B" opacity="0.9"/>
+  
+  <!-- Core Connection node -->
+  <circle cx="96" cy="96" r="6" fill="#FFFFFF"/>
+</svg>

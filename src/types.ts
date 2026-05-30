@@ -1,10 +1,23 @@
 export enum Tab {
   Dashboard = 'dashboard',
+  Profile = 'profile',
   Discover = 'discover',
   Projects = 'projects',
   Communities = 'communities',
   Messages = 'messages',
-  Settings = 'settings'
+  Settings = 'settings',
+  Recommendations = 'recommendations'
+}
+
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  description: string;
+  stars: number;
+  forks: number;
+  language: string;
+  langColor: string;
+  link: string;
 }
 
 export interface Student {
@@ -20,6 +33,8 @@ export interface Student {
   interests: string[];
   availability: 'Available' | 'Busy' | 'Part-time';
   matchScore?: number;
+  portfolio?: PortfolioItem[];
+  skillsProficiency?: Record<string, 'Expert' | 'Intermediate' | 'Beginner'>;
 }
 
 export interface Project {
@@ -55,6 +70,7 @@ export interface Message {
   text: string;
   timestamp: string;
   isMe: boolean;
+  reactions?: { emoji: string; count: number; users: string[] }[];
 }
 
 export interface ChatThread {

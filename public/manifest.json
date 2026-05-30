@@ -1,0 +1,25 @@
+{
+  "short_name": "SkillSync",
+  "name": "SkillSync - Academic Peer & Project Coordinator",
+  "description": "Excluvise student collaboration PWA for matching project goals with fellow peer skill profiles.",
+  "icons": [
+    {
+      "src": "/logo-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1e1b4b",
+  "theme_color": "#3B82F6",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["education", "productivity", "social"]
+}

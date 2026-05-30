@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "A student profile registered on SkillSync",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique user identity identifier matching Firebase Auth UID" },
+        "name": { "type": "string", "description": "Full name of the academic peer" },
+        "avatar": { "type": "string", "description": "Initials representing the academic's avatar profile" },
+        "email": { "type": "string", "format": "email", "description": "Academic verified email address" },
+        "university": { "type": "string", "description": "Primary academic institution" },
+        "major": { "type": "string", "description": "Core educational field of study" },
+        "year": { "type": "string", "description": "Current enrollment rank year" },
+        "bio": { "type": "string", "description": "Brief academic overview biography" },
+        "skills": { "type": "array", "description": "Verified skills list" },
+        "interests": { "type": "array", "description": "Academic interest highlights" },
+        "availability": { "type": "string", "enum": ["Available", "Busy", "Part-time"], "description": "Student current bandwidth status" }
+      },
+      "required": ["id", "name", "avatar", "email", "university", "major", "year", "bio", "skills", "interests", "availability"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "An active collaborative project opportunity or venture",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique project identifier index" },
+        "title": { "type": "string", "description": "Project title" },
+        "description": { "type": "string", "description": "Detailed description of project and goals" },
+        "creatorId": { "type": "string", "description": "Student UID of the project architect" },
+        "creatorName": { "type": "string", "description": "Name of the developer who created the project" },
+        "creatorAvatar": { "type": "string", "description": "Avatar initials representing the system architect" },
+        "skillsNeeded": { "type": "array", "description": "Core technologies needed to participate" },
+        "category": { "type": "string", "description": "Structural academic field category of project" },
+        "status": { "type": "string", "enum": ["Idea", "In Progress", "Completed"], "description": "Project baseline development cycle milestone status" },
+        "membersCount": { "type": "number", "description": "Total active project contributors" },
+        "openRolesCount": { "type": "number", "description": "Open spots left for recruitment" },
+        "createdAt": { "type": "string", "description": "Relative or ISO date string of project listing" }
+      },
+      "required": ["id", "title", "description", "creatorId", "creatorName", "creatorAvatar", "skillsNeeded", "category", "status", "membersCount", "openRolesCount", "createdAt"]
+    },
+    "Community": {
+      "title": "Community",
+      "description": "A shared interest category board/topic guild for student developers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of community guild" },
+        "name": { "type": "string", "description": "Name of the community interest group" },
+        "description": { "type": "string", "description": "Theme and outline overview of community forum" },
+        "category": { "type": "string", "description": "Group category header tag" },
+        "memberCount": { "type": "number", "description": "Total student readers subscribed" },
+        "postsCount": { "type": "number", "description": "Total historic topics created in community" },
+        "iconName": { "type": "string", "description": "Lucide icon string name used in visual layout" }
+      },
+      "required": ["id", "name", "description", "category", "memberCount", "postsCount", "iconName"]
+    },
+    "ChatThread": {
+      "title": "ChatThread",
+      "description": "A private direct messaging thread channel with another peer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Thread channel identifier" },
+        "participantName": { "type": "string", "description": "Name of the communication peer" },
+        "participantAvatar": { "type": "string", "description": "Avatar initials of the communication peer" },
+        "participantRole": { "type": "string", "description": "Academic title description profile of peer" },
+        "lastMessage": { "type": "string", "description": "Context preview snippet of most recent direct message content" },
+        "lastMessageTime": { "type": "string", "description": "Time reference tracker of last update" },
+        "unreadCount": { "type": "number", "description": "Total new messages unread by client profile" }
+      },
+      "required": ["id", "participantName", "participantAvatar", "participantRole", "lastMessage", "lastMessageTime", "unreadCount"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single text bubble content in a conversation channel or community category sub-thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique message identifier content index" },
+        "senderId": { "type": "string", "description": "Student UID sender of the message" },
+        "senderName": { "type": "string", "description": "Full display name of student sender" },
+        "senderAvatar": { "type": "string", "description": "Profile visual avatar icon of sender" },
+        "text": { "type": "string", "description": "Plaintext body content of chat text" },
+        "timestamp": { "type": "string", "description": "Human-friendly or ISO timestamp tracker" }
+      },
+      "required": ["id", "senderId", "senderName", "senderAvatar", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Information profiles representing verified student users"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Global database directory of projects"
+    },
+    "/communities/{communityId}": {
+      "schema": "Community",
+      "description": "Global lists of interactive topic communities"
+    },
+    "/threads/{threadId}": {
+      "schema": "ChatThread",
+      "description": "Direct conversation communication threads"
+    },
+    "/threads/{threadId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Direct messages under a specific conversation channel thread"
+    },
+    "/communities/{communityId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Interactive posts and comments under specific community boards"
+    }
+  }
+}

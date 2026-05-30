@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ----------------- Reusable Helper Primitives -----------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ----------------- Entity Validation -----------------
+    function isValidStudent(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+          && data.avatar is string && data.avatar.size() <= 10
+          && data.email is string && data.email.size() > 0 && data.email.size() <= 128
+          && data.university is string && data.university.size() <= 150
+          && data.major is string && data.major.size() <= 150
+          && data.year is string && data.year.size() <= 50
+          && data.bio is string && data.bio.size() <= 1000
+          && data.skills is list && data.skills.size() <= 30
+          && data.interests is list && data.interests.size() <= 30
+          && data.availability is string && (data.availability == 'Available' || data.availability == 'Busy' || data.availability == 'Part-time');
+    }
+
+    function isValidProject(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+          && data.description is string && data.description.size() <= 2000
+          && data.creatorId is string && data.creatorId.size() <= 128
+          && data.creatorName is string && data.creatorName.size() <= 100
+          && data.creatorAvatar is string && data.creatorAvatar.size() <= 10
+          && data.skillsNeeded is list && data.skillsNeeded.size() <= 30
+          && data.category is string && data.category.size() <= 100
+          && data.status is string && (data.status == 'Idea' || data.status == 'In Progress' || data.status == 'Completed')
+          && data.membersCount is int
+          && data.openRolesCount is int
+          && data.createdAt is string && data.createdAt.size() <= 100;
+    }
+
+    function isValidCommunity(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+          && data.description is string && data.description.size() <= 1000
+          && data.category is string && data.category.size() <= 100
+          && data.memberCount is int
+          && data.postsCount is int
+          && data.iconName is string && data.iconName.size() <= 50;
+    }
+
+    function isValidThread(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.participantName is string && data.participantName.size() <= 100
+          && data.participantAvatar is string && data.participantAvatar.size() <= 10
+          && data.participantRole is string && data.participantRole.size() <= 200
+          && data.lastMessage is string && data.lastMessage.size() <= 1000
+          && data.lastMessageTime is string && data.lastMessageTime.size() <= 50
+          && data.unreadCount is int;
+    }
+
+    function isValidMessage(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.senderId is string && data.senderId.size() <= 128
+          && data.senderName is string && data.senderName.size() <= 100
+          && data.senderAvatar is string && data.senderAvatar.size() <= 10
+          && data.text is string && data.text.size() <= 2000
+          && data.timestamp is string && data.timestamp.size() <= 100;
+    }
+
+    // ----------------- Collection Paths of Match Rules -----------------
+    
+    // Students Collection
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(studentId) && isValidStudent(incoming());
+      allow update: if isSignedIn() && isOwner(studentId) && isValidStudent(incoming()) && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isOwner(studentId);
+    }
+
+    // Projects Collection
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(projectId) && incoming().creatorId == request.auth.uid && isValidProject(incoming());
+      allow update: if isSignedIn() && isValidId(projectId) && (existing().creatorId == request.auth.uid || incoming().creatorId == request.auth.uid) && isValidProject(incoming()) && incoming().id == existing().id && incoming().creatorId == existing().creatorId;
+      allow delete: if isSignedIn() && isValidId(projectId) && existing().creatorId == request.auth.uid;
+    }
+
+    // Communities Collection
+    match /communities/{communityId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(communityId) && isValidCommunity(incoming());
+      allow update: if isSignedIn() && isValidId(communityId) && isValidCommunity(incoming()) && incoming().id == existing().id;
+      allow delete: if false;
+
+      // Sub-thread posts/messages inside a community guild
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidId(messageId) && incoming().senderId == request.auth.uid && isValidMessage(incoming());
+        allow update: if isSignedIn() && isValidId(messageId) && existing().senderId == request.auth.uid && isValidMessage(incoming()) && incoming().id == existing().id;
+        allow delete: if isSignedIn() && isValidId(messageId) && existing().senderId == request.auth.uid;
+      }
+    }
+
+    // Chat Threads Collection
+    match /threads/{threadId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(threadId) && isValidThread(incoming());
+      allow update: if isSignedIn() && isValidId(threadId) && isValidThread(incoming()) && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(threadId);
+
+      // Sub-thread message logs under a DM Chat Thread
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidId(messageId) && incoming().senderId == request.auth.uid && isValidMessage(incoming());
+        allow update: if isSignedIn() && isValidId(messageId) && existing().senderId == request.auth.uid && isValidMessage(incoming()) && incoming().id == existing().id;
+        allow delete: if isSignedIn() && isValidId(messageId) && existing().senderId == request.auth.uid;
+      }
+    }
+    
+    // Fallback for metadata-connection verifying collections
+    match /test-connection-meta/{infoId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
